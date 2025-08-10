@@ -1,0 +1,19 @@
+{
+  "collectionName": "components_custom_list_with_titles",
+  "info": {
+    "displayName": "List with title",
+    "icon": "bulletList"
+  },
+  "options": {},
+  "attributes": {
+    "list_title": {
+      "type": "string"
+    },
+    "list_point": {
+      "type": "component",
+      "component": "custom.point",
+      "repeatable": true
+    }
+  },
+  "config": {}
+}

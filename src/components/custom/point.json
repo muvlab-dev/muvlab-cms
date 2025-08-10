@@ -1,0 +1,14 @@
+{
+  "collectionName": "components_custom_points",
+  "info": {
+    "displayName": "point"
+  },
+  "options": {},
+  "attributes": {
+    "content": {
+      "type": "string",
+      "required": true
+    }
+  },
+  "config": {}
+}

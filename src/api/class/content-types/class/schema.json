@@ -4,7 +4,7 @@
   "info": {
     "singularName": "class",
     "pluralName": "classes",
-    "displayName": "Class"
+    "displayName": "ClassCategory"
   },
   "options": {
     "draftAndPublish": true
@@ -66,6 +66,12 @@
         }
       },
       "required": false
+    },
+    "class_types": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::class-type.class-type",
+      "mappedBy": "class_category"
     }
   }
 }
