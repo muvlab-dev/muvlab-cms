@@ -38,14 +38,19 @@
         "files"
       ]
     },
-    "bottom_text": {
-      "type": "blocks",
+    "hero_image_desktop": {
+      "type": "media",
       "pluginOptions": {
         "i18n": {
           "localized": true
         }
       },
-      "required": true
+      "multiple": false,
+      "required": true,
+      "allowedTypes": [
+        "images",
+        "files"
+      ]
     },
     "highlighted_persons": {
       "type": "relation",
@@ -56,6 +61,15 @@
       "type": "relation",
       "relation": "oneToMany",
       "target": "api::instructor.instructor"
+    },
+    "bottom_text": {
+      "type": "blocks",
+      "pluginOptions": {
+        "i18n": {
+          "localized": true
+        }
+      },
+      "required": true
     }
   }
 }
