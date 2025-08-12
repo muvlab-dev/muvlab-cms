@@ -12,6 +12,11 @@
     "price": {
       "type": "decimal",
       "required": true
+    },
+    "suffix": {
+      "type": "string",
+      "default": "zł",
+      "required": true
     }
   },
   "config": {}
