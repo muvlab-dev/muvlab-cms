@@ -1,0 +1,19 @@
+{
+  "collectionName": "components_prices_pricings",
+  "info": {
+    "displayName": "Pricing"
+  },
+  "options": {},
+  "attributes": {
+    "title": {
+      "type": "string",
+      "required": true
+    },
+    "item": {
+      "type": "component",
+      "component": "prices.pricing-item",
+      "repeatable": true
+    }
+  },
+  "config": {}
+}

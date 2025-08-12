@@ -1,0 +1,18 @@
+{
+  "collectionName": "components_prices_pricing_items",
+  "info": {
+    "displayName": "Pricing item"
+  },
+  "options": {},
+  "attributes": {
+    "name": {
+      "type": "string",
+      "required": true
+    },
+    "price": {
+      "type": "decimal",
+      "required": true
+    }
+  },
+  "config": {}
+}
