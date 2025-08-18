@@ -1,0 +1,23 @@
+{
+  "collectionName": "components_images_image_with_labels",
+  "info": {
+    "displayName": "Image with label"
+  },
+  "options": {},
+  "attributes": {
+    "image": {
+      "type": "media",
+      "multiple": false,
+      "required": true,
+      "allowedTypes": [
+        "images",
+        "files"
+      ]
+    },
+    "label": {
+      "type": "string",
+      "required": true
+    }
+  },
+  "config": {}
+}

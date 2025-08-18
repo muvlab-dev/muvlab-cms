@@ -1,0 +1,26 @@
+{
+  "collectionName": "components_images_hero_home_pages",
+  "info": {
+    "displayName": "Hero HomePage"
+  },
+  "options": {},
+  "attributes": {
+    "mobile_image": {
+      "type": "media",
+      "multiple": false,
+      "required": true,
+      "allowedTypes": [
+        "images",
+        "files"
+      ]
+    },
+    "desktop_images": {
+      "type": "component",
+      "component": "images.image-with-label",
+      "repeatable": true,
+      "required": true,
+      "max": 3
+    }
+  },
+  "config": {}
+}

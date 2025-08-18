@@ -1,0 +1,30 @@
+{
+  "kind": "singleType",
+  "collectionName": "muvlab_widgets",
+  "info": {
+    "singularName": "muvlab-widget",
+    "pluralName": "muvlab-widgets",
+    "displayName": "Widget Muvlab+"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {
+    "i18n": {
+      "localized": true
+    }
+  },
+  "attributes": {
+    "hero": {
+      "type": "component",
+      "pluginOptions": {
+        "i18n": {
+          "localized": true
+        }
+      },
+      "component": "images.hero-section",
+      "repeatable": false,
+      "required": true
+    }
+  }
+}

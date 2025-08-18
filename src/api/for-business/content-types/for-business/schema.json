@@ -15,6 +15,17 @@
     }
   },
   "attributes": {
+    "hero": {
+      "type": "component",
+      "pluginOptions": {
+        "i18n": {
+          "localized": true
+        }
+      },
+      "component": "images.hero-section",
+      "repeatable": false,
+      "required": true
+    },
     "hero_text_content": {
       "type": "blocks",
       "pluginOptions": {
