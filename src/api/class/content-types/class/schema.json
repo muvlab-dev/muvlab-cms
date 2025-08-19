@@ -72,6 +72,15 @@
       "relation": "oneToMany",
       "target": "api::class-type.class-type",
       "mappedBy": "class_category"
+    },
+    "momence_class_id": {
+      "type": "integer",
+      "pluginOptions": {
+        "i18n": {
+          "localized": true
+        }
+      },
+      "unique": false
     }
   }
 }
