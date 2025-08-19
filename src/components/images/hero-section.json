@@ -33,6 +33,14 @@
         "files"
       ]
     },
+    "hide_logo": {
+      "type": "boolean",
+      "required": true,
+      "default": false
+    },
+    "under_logo_text": {
+      "type": "string"
+    },
     "text": {
       "type": "blocks"
     }
