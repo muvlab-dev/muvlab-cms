@@ -74,13 +74,13 @@
       "mappedBy": "class_category"
     },
     "momence_class_id": {
-      "type": "integer",
+      "type": "string",
       "pluginOptions": {
         "i18n": {
           "localized": true
         }
       },
-      "unique": false
+      "unique": true
     }
   }
 }
