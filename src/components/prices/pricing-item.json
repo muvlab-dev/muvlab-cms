@@ -17,6 +17,9 @@
       "type": "string",
       "default": "zł",
       "required": true
+    },
+    "url": {
+      "type": "string"
     }
   },
   "config": {}
