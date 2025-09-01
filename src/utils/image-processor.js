@@ -81,6 +81,11 @@ async function processImageWithMetadata(imageRef, processConfigs = [], extra = {
 
     const outBuffer = await s.toBuffer();
 
+    if (!outBuffer || !outBuffer.length) {
+      throw new Error(`Empty buffer for ${filename}`);
+    }
+    console.log('[UPLOAD]', filename, 'size=', outBuffer.length);
+
     const uploaded = await uploadService.upload({
       data: {
         fileInfo: {
@@ -90,12 +95,16 @@ async function processImageWithMetadata(imageRef, processConfigs = [], extra = {
         },
         // opcjonalnie: folder: <folderId>,
       },
-      files: {
-        name: filename,
-        type: mime,
-        size: outBuffer.length,
-        buffer: outBuffer,
-      },
+      files: [
+        {
+          name: filename,
+          type: mime,
+          size: outBuffer.length,
+          buffer: outBuffer,         // <— KLUCZOWE
+          ext: `.${ext}`,            // pomaga providerom (np. do Content-Type)
+          hash: `${base}_${cfg.suffix}_${cfg.width}x${cfg.height}`, // stabilna nazwa
+        },
+      ],
     });
 
     const uf = Array.isArray(uploaded) ? uploaded[0] : uploaded;
