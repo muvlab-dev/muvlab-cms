@@ -89,6 +89,7 @@ function isImageObject(obj) {
  * Wzbogaca obraz o przetworzone warianty
  */
 function enrichImageWithProcessedVariants(image) {
+  console.log('IMAGE DEBUG', { url: image.url, caption: image.caption, name: image.name, hash: image.hash, ext: image.ext });
   try {
     // Jeśli już ma processedImages, nie nadpisuj
     if (image.processedImages) {

@@ -1,11 +1,7 @@
-// 1. src/utils/image-processor.js
 const sharp = require('sharp');
 const fs = require('fs').promises;
 const path = require('path');
 
-/**
- * Przetwarza obraz według podanej konfiguracji i zapisuje metadane
- */
 async function processImageWithMetadata(imageRef, processConfigs = [], metadata = {}) {
   const imageId = imageRef?.documentId || imageRef?.id || imageRef;
 
@@ -77,10 +73,13 @@ async function processImageWithOptions(imageRef, options) {
   if (!image) return null;
 
   const uploadsDir = path.join(strapi.dirs.static.public, 'uploads');
-  const originalPath = path.join(uploadsDir, image.name);
+  const publicRoot = strapi.dirs.static.public;
+  const relativeUrl = (image.url || '').replace(/^\//, '');
+  const originalPath = path.join(publicRoot, relativeUrl);
 
-  const extension = options.format === 'jpeg' ? 'jpg' : options.format;
-  const processedFilename = `${options.suffix}_${options.width}x${options.height}_${path.parse(image.name).name}.${extension}`;
+  const baseHash = image.hash || path.parse(relativeUrl).name;
+  const extension = (options.format === 'jpeg' ? 'jpg' : options.format) || (image.ext ? image.ext.replace('.', '') : 'jpg');
+  const processedFilename = `${baseHash}_${options.suffix}_${options.width}x${options.height}.${extension}`;
   const processedPath = path.join(uploadsDir, processedFilename);
 
   // Sprawdź czy plik już istnieje
