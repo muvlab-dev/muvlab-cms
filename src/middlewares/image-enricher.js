@@ -1,14 +1,5 @@
-// src/middlewares/image-enricher.js
-
-const {
-  parseImageMetadata
-} = require('../utils/image-helpers');
-
-// Lista modeli, które mają lifecycle z przetwarzaniem obrazów
-const MODELS_WITH_IMAGE_PROCESSING = [
-  'api::instructor.instructor',
-  // Dodaj tutaj inne modele które mają lifecycle z obrazami
-];
+// 2. src/middlewares/image-enricher.js
+const { parseImageMetadata } = require('../utils/image-processor');
 
 module.exports = () => {
   return async (ctx, next) => {
@@ -25,7 +16,7 @@ module.exports = () => {
         return;
       }
 
-      console.log('🔍 Sprawdzam możliwość wzbogacenia:', ctx.request.url);
+      console.log('🔍 Wzbogacam response dla:', ctx.request.url);
 
       enrichResponseWithProcessedImages(ctx.response.body.data);
 
@@ -79,7 +70,7 @@ function enrichItem(item) {
 }
 
 /**
- * Sprawdza czy obiekt to obraz Strapi (bezpieczniej)
+ * Sprawdza czy obiekt to obraz Strapi
  */
 function isImageObject(obj) {
   try {
@@ -95,7 +86,7 @@ function isImageObject(obj) {
 }
 
 /**
- * Wzbogaca obraz o przetworzone warianty (bezpieczniej)
+ * Wzbogaca obraz o przetworzone warianty
  */
 function enrichImageWithProcessedVariants(image) {
   try {
@@ -130,9 +121,9 @@ function enrichImageWithProcessedVariants(image) {
         }
       });
 
-      console.log(`🖼️ Wzbogacono obraz ${image.name} o ${metadata.variants.length} wariantów`);
+      console.log(`🖼️ Wzbogacono obraz ${image.name} o ${metadata.variants.length} wariantów: ${metadata.variants.map(v => v.suffix).join(', ')}`);
     } else {
-      console.log(`ℹ️ Obraz ${image.name} nie ma przetworzonych wariantów`);
+      console.log(`ℹ️ Obraz ${image.name} nie ma przetworzonych wariantów - tylko oryginał`);
     }
 
   } catch (error) {
@@ -151,22 +142,3 @@ function enrichImageWithProcessedVariants(image) {
     }
   }
 }
-
-/**
- * Sprawdza czy model ma skonfigurowane przetwarzanie obrazów
- */
-function hasImageProcessing(contentType) {
-  return MODELS_WITH_IMAGE_PROCESSING.includes(contentType);
-}
-
-/**
- * Dodaje model do listy z przetwarzaniem obrazów
- */
-function addModelWithImageProcessing(contentType) {
-  if (!MODELS_WITH_IMAGE_PROCESSING.includes(contentType)) {
-    MODELS_WITH_IMAGE_PROCESSING.push(contentType);
-    console.log(`➕ Dodano model z przetwarzaniem obrazów: ${contentType}`);
-  }
-}
-
-module.exports.addModelWithImageProcessing = addModelWithImageProcessing;
