@@ -1,35 +1,66 @@
-// src/utils/image-processor.js (CLOUD SAFE, MINIMAL)
+// src/utils/image-processor.js (Cloud-safe + robust URL resolve)
 const sharp = require('sharp');
 const path = require('path');
+
+function joinUrl(base, rel) {
+  if (!rel) return base;
+  if (/^https?:\/\//i.test(rel)) return rel;
+  const b = (base || '').replace(/\/+$/, '');
+  const r = String(rel).replace(/^\/+/, '');
+  return `${b}/${r}`;
+}
+
+async function getDownloadUrlForFile(file) {
+  // 1) Jeśli provider potrafi robić signed URL – użyj go (lepsze na private bucket)
+  const provider = strapi?.plugin('upload')?.provider;
+  if (provider && typeof provider.getSignedUrl === 'function') {
+    try {
+      const signed = await provider.getSignedUrl(file);
+      if (signed && typeof signed === 'string') return signed;
+      if (signed && signed.url) return signed.url;
+    } catch (e) {
+      // brak signed URL albo błąd – spróbujemy ścieżką publiczną
+    }
+  }
+
+  // 2) W innym wypadku budujemy publiczny absolutny URL
+  const base =
+    process.env.STRAPI_URL ||
+    strapi?.config?.get?.('server.url') ||
+    process.env.PUBLIC_URL ||
+    '';
+
+  // UWAGA: jeśli base jest puste, a file.url jest względne – fetch zwróci błąd
+  return joinUrl(base, file.url);
+}
 
 async function processImageWithMetadata(imageRef, processConfigs = [], extra = {}) {
   const imageId = imageRef?.documentId || imageRef?.id || imageRef;
   if (!imageId) return null;
 
-  // 1) Pobierz rekord oryginału (asset)
-  const image = await strapi
-    .documents('plugin::upload.file')
-    .findOne({ documentId: imageId });
-  if (!image || !image.mime?.startsWith('image/')) return null;
+  const file = await strapi.documents('plugin::upload.file').findOne({ documentId: imageId });
+  if (!file || !file.mime?.startsWith('image/')) return null;
 
-  // 2) Pobierz binarkę oryginału z publicznego URL (cloud storage)
-  //    (zakładam, że pliki są publiczne; jeśli prywatne, trzeba dodać auth header)
-  const absUrl = image.url.startsWith('http')
-    ? image.url
-    : `${strapi.config.server.url}${image.url}`;
-  const res = await fetch(absUrl);
-  if (!res.ok) throw new Error(`Download failed: ${res.status} ${res.statusText}`);
+  // --- Download oryginału z providera/HTTP ---
+  const downloadUrl = await getDownloadUrlForFile(file);
+  if (!downloadUrl || !/^https?:\/\//i.test(downloadUrl)) {
+    throw new Error(`Cannot resolve absolute URL for file ${file.id || file.documentId}: url="${file.url}", base="${process.env.STRAPI_URL || strapi?.config?.get?.('server.url') || ''}"`);
+  }
+
+  const res = await fetch(downloadUrl);
+  if (!res.ok) {
+    throw new Error(`Download failed (${res.status} ${res.statusText}) for ${downloadUrl}`);
+  }
   const inputBuffer = Buffer.from(await res.arrayBuffer());
 
-  const variants = [];
-  const base = image.hash || path.parse(image.url).name;
-
-  // 3) Przetwórz i wrzuć każdy wariant przez Upload service (BEZ zapisu na dysk)
   const uploadService = strapi.plugin('upload').service('upload');
+  const variants = [];
+  const base = file.hash || path.parse(file.url || '').name || `file_${Date.now()}`;
+
   for (const cfg of processConfigs) {
     const ext =
       (cfg.format === 'jpeg' ? 'jpg' : cfg.format) ||
-      (image.ext ? image.ext.replace('.', '') : 'jpg');
+      (file.ext ? file.ext.replace('.', '') : 'jpg');
     const filename = `${base}_${cfg.suffix}_${cfg.width}x${cfg.height}.${ext}`;
     const mime =
       cfg.format === 'webp'
@@ -38,48 +69,46 @@ async function processImageWithMetadata(imageRef, processConfigs = [], extra = {
           ? 'image/png'
           : 'image/jpeg';
 
-    // sharp -> buffer
     let s = sharp(inputBuffer).resize(cfg.width, cfg.height, {
       fit: cfg.fit || 'cover',
       position: cfg.position || 'center',
       withoutEnlargement: cfg.withoutEnlargement !== false,
     });
+
     if (cfg.format === 'webp') s = s.webp({ quality: cfg.quality ?? 85 });
     else if (cfg.format === 'png') s = s.png({ quality: cfg.quality ?? 85, compressionLevel: 9 });
     else s = s.jpeg({ quality: cfg.quality ?? 85, progressive: true, mozjpeg: true });
+
     const outBuffer = await s.toBuffer();
 
-    // upload z bufora jako nowy asset
     const uploaded = await uploadService.upload({
       data: {
-        // opcjonalnie: przypnij do folderu:
-        // folder: someFolderId,
         fileInfo: {
           name: filename,
-          alternativeText: image.alternativeText || '',
-          caption: image.caption || '',
+          alternativeText: file.alternativeText || '',
+          caption: file.caption || '',
         },
+        // opcjonalnie: folder: <folderId>,
       },
       files: {
         name: filename,
         type: mime,
         size: outBuffer.length,
-        buffer: outBuffer, // <-- kluczowe na Cloud
+        buffer: outBuffer,
       },
     });
 
-    // uploadService.upload zwraca tablicę lub pojedynczy obiekt (zależnie od providera)
-    const file = Array.isArray(uploaded) ? uploaded[0] : uploaded;
+    const uf = Array.isArray(uploaded) ? uploaded[0] : uploaded;
     variants.push({
       suffix: cfg.suffix,
-      url: file?.url, // publiczny adres wariantu z providera (S3, R2, itp.)
+      url: uf?.url,
       width: cfg.width,
       height: cfg.height,
       format: ext,
     });
   }
 
-  // 4) Zapisz metadane wariantów w oryginale (tak jak dotąd)
+  // Zapis metadanych wariantów w oryginale (caption)
   await strapi.documents('plugin::upload.file').update({
     documentId: imageId,
     data: {
@@ -92,7 +121,7 @@ async function processImageWithMetadata(imageRef, processConfigs = [], extra = {
     },
   });
 
-  return { originalImage: image, processedVariants: variants };
+  return { originalImage: file, processedVariants: variants };
 }
 
 function parseImageMetadata(image) {
