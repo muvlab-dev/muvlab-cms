@@ -1,4 +1,3 @@
-// 2. src/middlewares/image-enricher.js
 const { parseImageMetadata } = require('../utils/image-processor');
 
 module.exports = () => {
@@ -6,12 +5,10 @@ module.exports = () => {
     try {
       await next();
 
-      // Tylko dla GET requestów
       if (ctx.request.method !== 'GET') {
         return;
       }
 
-      // Sprawdź czy to API response z danymi
       if (!ctx.response.body?.data || !ctx.request.url.startsWith('/api/')) {
         return;
       }
@@ -22,7 +19,6 @@ module.exports = () => {
 
     } catch (error) {
       console.error('❌ Błąd w image-enricher middleware:', error.message);
-      // Nie blokuj requesta, kontynuuj normalnie
     }
   };
 };
@@ -43,25 +39,19 @@ function enrichItem(item) {
   try {
     if (!item || typeof item !== 'object') return;
 
-    // Sprawdź wszystkie pola w obiekcie
     Object.keys(item).forEach(key => {
       try {
         const value = item[key];
-
         if (Array.isArray(value)) {
-          // Jeśli to tablica, przetwórz każdy element
           value.forEach(enrichItem);
         } else if (value && typeof value === 'object') {
-          // Sprawdź czy to obraz Strapi
           if (isImageObject(value)) {
             enrichImageWithProcessedVariants(value);
           }
-          // Rekurencyjnie przetwórz zagnieżdżone obiekty
           enrichItem(value);
         }
       } catch (error) {
         console.error(`❌ Błąd przetwarzania pola ${key}:`, error.message);
-        // Kontynuuj z innymi polami
       }
     });
   } catch (error) {
@@ -69,9 +59,6 @@ function enrichItem(item) {
   }
 }
 
-/**
- * Sprawdza czy obiekt to obraz Strapi
- */
 function isImageObject(obj) {
   try {
     return obj &&
@@ -85,21 +72,14 @@ function isImageObject(obj) {
   }
 }
 
-/**
- * Wzbogaca obraz o przetworzone warianty
- */
 function enrichImageWithProcessedVariants(image) {
-  console.log('IMAGE DEBUG', { url: image.url, caption: image.caption, name: image.name, hash: image.hash, ext: image.ext });
   try {
-    // Jeśli już ma processedImages, nie nadpisuj
     if (image.processedImages) {
       return;
     }
 
-    // Sprawdź czy obraz ma metadane o przetwarzaniu
     const metadata = parseImageMetadata(image);
 
-    // Zawsze dodaj podstawową strukturę
     image.processedImages = {
       original: {
         url: image.url,
@@ -110,7 +90,6 @@ function enrichImageWithProcessedVariants(image) {
     };
 
     if (metadata?.processed && metadata?.variants) {
-      // Dodaj przetworzone warianty z metadanych
       metadata.variants.forEach(variant => {
         if (variant.suffix && variant.url) {
           image.processedImages[variant.suffix] = {
@@ -121,16 +100,9 @@ function enrichImageWithProcessedVariants(image) {
           };
         }
       });
-
-      console.log(`🖼️ Wzbogacono obraz ${image.name} o ${metadata.variants.length} wariantów: ${metadata.variants.map(v => v.suffix).join(', ')}`);
-    } else {
-      console.log(`ℹ️ Obraz ${image.name} nie ma przetworzonych wariantów - tylko oryginał`);
     }
 
   } catch (error) {
-    console.error(`❌ Błąd wzbogacania obrazu ${image?.name}:`, error.message);
-
-    // Fallback - dodaj przynajmniej oryginał
     if (!image.processedImages) {
       image.processedImages = {
         original: {

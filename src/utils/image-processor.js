@@ -1,162 +1,108 @@
+// src/utils/image-processor.js (CLOUD SAFE, MINIMAL)
 const sharp = require('sharp');
-const fs = require('fs').promises;
 const path = require('path');
 
-async function processImageWithMetadata(imageRef, processConfigs = [], metadata = {}) {
+async function processImageWithMetadata(imageRef, processConfigs = [], extra = {}) {
   const imageId = imageRef?.documentId || imageRef?.id || imageRef;
+  if (!imageId) return null;
 
-  if (!imageId) {
-    console.log('Brak ID obrazu');
-    return null;
-  }
+  // 1) Pobierz rekord oryginału (asset)
+  const image = await strapi
+    .documents('plugin::upload.file')
+    .findOne({ documentId: imageId });
+  if (!image || !image.mime?.startsWith('image/')) return null;
 
-  const image = await strapi.documents('plugin::upload.file').findOne({
-    documentId: imageId
-  });
+  // 2) Pobierz binarkę oryginału z publicznego URL (cloud storage)
+  //    (zakładam, że pliki są publiczne; jeśli prywatne, trzeba dodać auth header)
+  const absUrl = image.url.startsWith('http')
+    ? image.url
+    : `${strapi.config.server.url}${image.url}`;
+  const res = await fetch(absUrl);
+  if (!res.ok) throw new Error(`Download failed: ${res.status} ${res.statusText}`);
+  const inputBuffer = Buffer.from(await res.arrayBuffer());
 
-  if (!image || !image.mime?.startsWith('image/')) {
-    console.log('Nie znaleziono obrazu lub nie jest obrazem');
-    return null;
-  }
+  const variants = [];
+  const base = image.hash || path.parse(image.url).name;
 
-  console.log(`🖼️ Przetwarzam obraz: ${image.name}`);
+  // 3) Przetwórz i wrzuć każdy wariant przez Upload service (BEZ zapisu na dysk)
+  const uploadService = strapi.plugin('upload').service('upload');
+  for (const cfg of processConfigs) {
+    const ext =
+      (cfg.format === 'jpeg' ? 'jpg' : cfg.format) ||
+      (image.ext ? image.ext.replace('.', '') : 'jpg');
+    const filename = `${base}_${cfg.suffix}_${cfg.width}x${cfg.height}.${ext}`;
+    const mime =
+      cfg.format === 'webp'
+        ? 'image/webp'
+        : cfg.format === 'png'
+          ? 'image/png'
+          : 'image/jpeg';
 
-  const processedVariants = [];
+    // sharp -> buffer
+    let s = sharp(inputBuffer).resize(cfg.width, cfg.height, {
+      fit: cfg.fit || 'cover',
+      position: cfg.position || 'center',
+      withoutEnlargement: cfg.withoutEnlargement !== false,
+    });
+    if (cfg.format === 'webp') s = s.webp({ quality: cfg.quality ?? 85 });
+    else if (cfg.format === 'png') s = s.png({ quality: cfg.quality ?? 85, compressionLevel: 9 });
+    else s = s.jpeg({ quality: cfg.quality ?? 85, progressive: true, mozjpeg: true });
+    const outBuffer = await s.toBuffer();
 
-  for (const config of processConfigs) {
-    try {
-      const result = await processImageWithOptions(imageRef, config);
-      if (result) {
-        processedVariants.push({
-          suffix: config.suffix,
-          url: result.url,
-          width: result.width,
-          height: result.height,
-          format: result.format
-        });
-        console.log(`✅ Przetworzono ${config.suffix}: ${config.width}x${config.height}`);
-      }
-    } catch (error) {
-      console.error(`❌ Błąd przetwarzania ${config.suffix}:`, error);
-    }
-  }
-
-  // Zapisz metadane w caption obrazu
-  try {
-    await strapi.documents('plugin::upload.file').update({
-      documentId: imageId,
+    // upload z bufora jako nowy asset
+    const uploaded = await uploadService.upload({
       data: {
-        caption: JSON.stringify({
-          processed: true,
-          variants: processedVariants,
-          processedAt: new Date().toISOString(),
-          ...metadata
-        })
-      }
+        // opcjonalnie: przypnij do folderu:
+        // folder: someFolderId,
+        fileInfo: {
+          name: filename,
+          alternativeText: image.alternativeText || '',
+          caption: image.caption || '',
+        },
+      },
+      files: {
+        name: filename,
+        type: mime,
+        size: outBuffer.length,
+        buffer: outBuffer, // <-- kluczowe na Cloud
+      },
     });
 
-    console.log(`💾 Zapisano metadane dla ${image.name}: ${processConfigs.map(c => c.suffix).join(', ')}`);
-  } catch (error) {
-    console.error('Błąd zapisywania metadanych:', error);
+    // uploadService.upload zwraca tablicę lub pojedynczy obiekt (zależnie od providera)
+    const file = Array.isArray(uploaded) ? uploaded[0] : uploaded;
+    variants.push({
+      suffix: cfg.suffix,
+      url: file?.url, // publiczny adres wariantu z providera (S3, R2, itp.)
+      width: cfg.width,
+      height: cfg.height,
+      format: ext,
+    });
   }
 
-  return { originalImage: image, processedVariants };
-}
-
-async function processImageWithOptions(imageRef, options) {
-  const imageId = imageRef?.documentId || imageRef?.id || imageRef;
-
-  const image = await strapi.documents('plugin::upload.file').findOne({
-    documentId: imageId
+  // 4) Zapisz metadane wariantów w oryginale (tak jak dotąd)
+  await strapi.documents('plugin::upload.file').update({
+    documentId: imageId,
+    data: {
+      caption: JSON.stringify({
+        processed: true,
+        processedAt: new Date().toISOString(),
+        variants,
+        ...extra,
+      }),
+    },
   });
 
-  if (!image) return null;
-
-  const uploadsDir = path.join(strapi.dirs.static.public, 'uploads');
-  const publicRoot = strapi.dirs.static.public;
-  const relativeUrl = (image.url || '').replace(/^\//, '');
-  const originalPath = path.join(publicRoot, relativeUrl);
-
-  const baseHash = image.hash || path.parse(relativeUrl).name;
-  const extension = (options.format === 'jpeg' ? 'jpg' : options.format) || (image.ext ? image.ext.replace('.', '') : 'jpg');
-  const processedFilename = `${baseHash}_${options.suffix}_${options.width}x${options.height}.${extension}`;
-  const processedPath = path.join(uploadsDir, processedFilename);
-
-  // Sprawdź czy plik już istnieje
-  try {
-    await fs.access(processedPath);
-    return {
-      filename: processedFilename,
-      url: `/uploads/${processedFilename}`,
-      width: options.width,
-      height: options.height,
-      format: options.format
-    };
-  } catch {
-    // Plik nie istnieje, utwórz go
-  }
-
-  // Sprawdź czy oryginalny plik istnieje
-  try {
-    await fs.access(originalPath);
-  } catch {
-    console.log(`Oryginalny plik nie istnieje: ${originalPath}`);
-    return null;
-  }
-
-  // Przetwórz obraz
-  let processedSharp = sharp(originalPath).resize(options.width, options.height, {
-    fit: options.fit || 'cover',
-    position: options.position || 'center',
-    withoutEnlargement: options.withoutEnlargement !== false
-  });
-
-  switch (options.format) {
-    case 'webp':
-      processedSharp = processedSharp.webp({ quality: options.quality || 85 });
-      break;
-    case 'png':
-      processedSharp = processedSharp.png({
-        quality: options.quality || 85,
-        compressionLevel: 9
-      });
-      break;
-    case 'jpeg':
-    default:
-      processedSharp = processedSharp.jpeg({
-        quality: options.quality || 85,
-        progressive: true,
-        mozjpeg: true
-      });
-      break;
-  }
-
-  await processedSharp.toFile(processedPath);
-
-  return {
-    filename: processedFilename,
-    url: `/uploads/${processedFilename}`,
-    width: options.width,
-    height: options.height,
-    format: options.format
-  };
+  return { originalImage: image, processedVariants: variants };
 }
 
-/**
- * Parsuje metadane obrazu z caption
- */
 function parseImageMetadata(image) {
   if (!image?.caption) return null;
-
   try {
-    const metadata = JSON.parse(image.caption);
-    return metadata.processed ? metadata : null;
+    const meta = JSON.parse(image.caption);
+    return meta?.processed ? meta : null;
   } catch {
     return null;
   }
 }
 
-module.exports = {
-  processImageWithMetadata,
-  parseImageMetadata
-};
+module.exports = { processImageWithMetadata, parseImageMetadata };
