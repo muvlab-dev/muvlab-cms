@@ -10,7 +10,7 @@ module.exports = {
     strapi.documents.use(async (ctx, next) => {
       if (!APPLY_TO.includes(ctx.uid) || !['create', 'update'].includes(ctx.action)) return next();
 
-      const data = ctx.params?.data || {};
+      const data = (ctx.params && ctx.params.data) ? ctx.params.data : {};
       const perModel = (cfg[ctx.uid] && cfg[ctx.uid].fields) || {};
       const customFormats = data.customFormats || {};
 
@@ -30,8 +30,13 @@ module.exports = {
         const documentId = pickDocId(mediaChange);
         if (!documentId) continue;
 
-        const variant = await makeWebpVariantFromUploadDocumentId(documentId, opts);
-        customFormats[field] = { ...(customFormats[field] || {}), webp: variant };
+        try {
+          const variant = await makeWebpVariantFromUploadDocumentId(documentId, opts);
+          customFormats[field] = { ...(customFormats[field] || {}), webp: variant };
+        } catch (e) {
+          console.error('[image] FAILED', { uid: ctx.uid, field, documentId, msg: e && e.message });
+          throw e;
+        }
       }
 
       if (Object.keys(customFormats).length) {
