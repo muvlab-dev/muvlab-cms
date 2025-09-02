@@ -22,54 +22,40 @@ async function processTopLevel(uid, data, conf, custom) {
   }
 }
 
-async function processComponentBranch(branch, input, outStore, makeVariant) {
+async function processComponentBranch(branch, input, store, makeVariant) {
   const { fields = {}, repeatable = false } = branch;
   if (!input) return;
 
-  const handleInto = async (target, node) => {
-    let wrote = false;
+  const handleOne = async (node) => {
     for (const field of Object.keys(fields)) {
       const docId = pickDocId(node[field]);
       if (!docId) continue;
       const v = await makeVariant(docId, fields[field]);
-      target[field] = Object.assign({}, target[field] || {}, { webp: v });
-      wrote = true;
+      store[field] = Object.assign({}, store[field] || {}, { webp: v });
     }
-    return wrote;
   };
 
   if (repeatable && Array.isArray(input)) {
-    const items = [];
+    store.items = store.items || [];
     for (let i = 0; i < input.length; i++) {
-      const tmp = {};
-      const wrote = await handleInto(tmp, input[i]);
-      items[i] = wrote ? tmp : null;
+      const dest = store.items[i] || {};
+      await handleOne(input[i]);
+      store.items[i] = dest;
     }
-    const hasAny = items.some(Boolean);
-    if (hasAny) outStore.items = items;
   } else if (typeof input === 'object') {
-    await handleInto(outStore, input);
+    await handleOne(input);
   }
 }
-
 
 async function processComponents(uid, data, conf, custom) {
   const comps = conf.components || {};
   for (const attrName of Object.keys(comps)) {
     const branch = comps[attrName];
     const node = data[attrName];
-    if (!node) continue; // brak komponentu w payloadzie → nic nie twórz
-
-    const tmpStore = {};
-    await processComponentBranch(branch, node, tmpStore, makeVariantFromDocumentId);
-
-    // dopisz tylko, jeśli faktycznie coś powstało
-    if (Object.keys(tmpStore).length || (tmpStore.items && tmpStore.items.some(Boolean))) {
-      custom[attrName] = Object.assign({}, custom[attrName] || {}, tmpStore);
-    }
+    custom[attrName] = custom[attrName] || {};
+    await processComponentBranch(branch, node, custom[attrName], makeVariantFromDocumentId);
   }
 }
-
 
 function createLifecycle(uid) {
   return {
