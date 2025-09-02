@@ -26,5 +26,6 @@
       "repeatable": false,
       "required": true
     }
-  }
+  },
+  "customFormats": { "type": "json" }
 }

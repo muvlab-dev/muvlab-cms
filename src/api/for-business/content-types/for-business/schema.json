@@ -38,6 +38,7 @@
           "localized": true
         }
       }
-    }
+    },
+    "customFormats": { "type": "json" }
   }
 }

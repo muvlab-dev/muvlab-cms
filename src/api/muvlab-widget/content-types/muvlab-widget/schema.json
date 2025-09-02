@@ -25,6 +25,7 @@
       "component": "images.hero-section",
       "repeatable": false,
       "required": true
-    }
+    },
+    "customFormats": { "type": "json" }
   }
 }

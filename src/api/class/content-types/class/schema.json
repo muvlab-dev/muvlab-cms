@@ -81,6 +81,7 @@
         }
       },
       "unique": true
-    }
+    },
+    "customFormats": { "type": "json" }
   }
 }
