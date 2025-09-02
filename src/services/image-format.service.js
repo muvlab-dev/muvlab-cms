@@ -1,5 +1,8 @@
 const sharp = require('sharp');
 const { Readable } = require('node:stream');
+const fs = require('node:fs/promises');
+const path = require('node:path');
+const crypto = require('node:crypto');
 
 function absUrl(u) {
   if (!u) return u;
@@ -35,14 +38,17 @@ async function makeWebpVariantFromUploadDocumentId(documentId, opts) {
   const uploadService = strapi.service('plugin::upload.upload');
   const basename = file.name.replace(/\.[^.]+$/,'');
   const outName = `${basename}-${opts.width}x${opts.height}.webp`;
-  const stream = Readable.from(output);
+  const tmpPath = path.join('/tmp', `${crypto.randomUUID()}-${outName}`);
+  await fs.writeFile(tmpPath, output);
 
   const [uploaded] = await uploadService.upload({
     data: {
       fileInfo: { name: outName, alternativeText: file.alternativeText || outName, caption: file.caption || '' }
     },
-    files: { name: outName, type: 'image/webp', size: output.length, stream }
+    files: [{ path: tmpPath, name: outName, type: 'image/webp', size: output.length }]
   });
+
+  await fs.unlink(tmpPath).catch(() => {});
 
   return {
     documentId: uploaded.documentId || uploaded.id,
