@@ -26,7 +26,6 @@
       "repeatable": false,
       "required": true
     },
-    "customFormats": { "type": "json" },
     "highlighted_persons": {
       "type": "relation",
       "relation": "oneToMany",
