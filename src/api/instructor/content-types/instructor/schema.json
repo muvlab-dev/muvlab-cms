@@ -69,6 +69,7 @@
         "files"
       ]
     },
+    "customFormats": { "type": "json" },
     "description": {
       "type": "blocks",
       "pluginOptions": {
