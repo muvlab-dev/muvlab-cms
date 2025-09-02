@@ -1,8 +1,12 @@
 const sharp = require('sharp');
+const { Readable } = require('node:stream');
 
-function absUrl(url) {
-  const base = strapi.config.get('server.url') || process.env.PUBLIC_URL || '';
-  return url.startsWith('http') ? url : `${base}${url}`;
+function absUrl(u) {
+  if (!u) return u;
+  try { return new URL(u).toString(); } catch {}
+  const port = process.env.PORT || 1337;
+  const base = strapi.config.get('server.url') || process.env.PUBLIC_URL || `http://localhost:${port}`;
+  return new URL(u, base).toString();
 }
 
 async function downloadBuffer(fileUrl) {
@@ -17,8 +21,7 @@ async function makeWebpVariantFromUploadDocumentId(documentId, opts) {
     .documents('plugin::upload.file')
     .findFirst({
       where: { documentId },
-      fields: ['name','url','alternativeText','caption'],
-      populate: { folder: true }
+      fields: ['name','url','alternativeText','caption']
     });
   if (!file || !file.url) throw new Error(`Upload file not found: ${documentId}`);
 
@@ -32,13 +35,13 @@ async function makeWebpVariantFromUploadDocumentId(documentId, opts) {
   const uploadService = strapi.service('plugin::upload.upload');
   const basename = file.name.replace(/\.[^.]+$/,'');
   const outName = `${basename}-${opts.width}x${opts.height}.webp`;
+  const stream = Readable.from(output);
 
   const [uploaded] = await uploadService.upload({
     data: {
-      fileInfo: { name: outName, alternativeText: file.alternativeText || outName, caption: file.caption || '' },
-      folder: file.folder || undefined
+      fileInfo: { name: outName, alternativeText: file.alternativeText || outName, caption: file.caption || '' }
     },
-    files: { name: outName, type: 'image/webp', size: output.length, buffer: output }
+    files: { name: outName, type: 'image/webp', size: output.length, stream }
   });
 
   return {
