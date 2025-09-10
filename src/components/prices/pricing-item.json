@@ -20,6 +20,12 @@
     },
     "url": {
       "type": "string"
+    },
+    "long_name": {
+      "type": "string"
+    },
+    "description": {
+      "type": "blocks"
     }
   },
   "config": {}
