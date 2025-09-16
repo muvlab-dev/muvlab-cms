@@ -7,7 +7,7 @@ module.exports = () => ({
     config: {
       mimeTypes: undefined,
       options: {
-        quality: 85,
+        quality: 99,
         // WebP options: https://sharp.pixelplumbing.com/api-output#webp
       },
     },
